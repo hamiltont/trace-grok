@@ -16,10 +16,19 @@ var traceDir string = "traces"
 func main() {
 	// defer trace.Stop()
 	// trace.Start(os.Stderr)
-	fmt.Println("Hello World!")
 	createDirIfNotExist(traceDir)
-	runOne()
-	chromeDPscreenshot()
+	test_reflect()
+	// runOne()
+	// chromeDPscreenshot()
+}
+
+func test_reflect() {
+	methods, names := GatherExamples()
+	fmt.Printf("Found %d methods\n", len(methods))
+
+	e := methods[0]
+	fmt.Printf("Calling %s\n", names[0])
+	e.Call(nil)
 }
 
 func createDirIfNotExist(dir string) {
@@ -43,7 +52,7 @@ func runOne() {
 		panic(err)
 	}
 
-	Hello()
+	// Hello()
 
 	trace.Stop()
 }

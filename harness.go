@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	gwChrome "github.com/sensepost/gowitness/chrome"
-	"net/url"
+	"io/ioutil"
+	"log"
 	"os"
 	"runtime/trace"
+
+	"github.com/chromedp/chromedp"
 )
 
 var traceDir string = "traces"
@@ -16,7 +19,7 @@ func main() {
 	fmt.Println("Hello World!")
 	createDirIfNotExist(traceDir)
 	runOne()
-	screenshotTrace()
+	chromeDPscreenshot()
 }
 
 func createDirIfNotExist(dir string) {
@@ -45,17 +48,34 @@ func runOne() {
 	trace.Stop()
 }
 
-func screenshotTrace() {
+func chromeDPscreenshot() {
+	// create context
+	// ctx, cancel := chromedp.NewContext(context.Background(), chromedp.WithDebugf(log.Printf))
+	ctx, cancel := chromedp.NewContext(context.Background())
+	defer cancel()
 
-	chrome := &gwChrome.Chrome{
-		Resolution:    `800x600`,
-		ChromeTimeout: 30,
+	// capture screenshot of an element
+	var buf []byte
+	if err := chromedp.Run(ctx, traceScreenshot(`http://127.0.0.1:8080/trace`, &buf)); err != nil {
+		log.Fatal(err)
 	}
-	chrome.Setup()
+	if err := ioutil.WriteFile("elementScreenshot.png", buf, 0644); err != nil {
+		log.Fatal(err)
+	}
 
-	u, err := url.ParseRequestURI(`http://127.0.0.1:8080/trace`)
-	if err != nil {
-		panic(err)
+}
+
+func traceScreenshot(urlstr string, res *[]byte) chromedp.Tasks {
+	// chromedp.Sleep(15 * time.Second),
+	loadingSelector := "body > overlay"
+	traceViewerId := "#trace-viewer"
+	mouseModeSelector := "#track_view_container > tr-ui-timeline-track-view > tr-ui-b-mouse-mode-selector"
+	return chromedp.Tasks{
+		chromedp.Navigate(urlstr),
+		chromedp.WaitNotPresent(loadingSelector, chromedp.ByQuery),
+		chromedp.WaitVisible(traceViewerId, chromedp.ByID),
+		chromedp.WaitVisible(mouseModeSelector, chromedp.ByQuery),
+		chromedp.SetAttributeValue(mouseModeSelector, "style.display", "none"),
+		chromedp.Screenshot(traceViewerId, res, chromedp.NodeVisible, chromedp.ByID),
 	}
-	chrome.ScreenshotURL(u, `trace.png`)
 }

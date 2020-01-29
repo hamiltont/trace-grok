@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"runtime"
 	"runtime/trace"
+	"syscall"
 	"time"
 
 	"github.com/chromedp/chromedp"
@@ -24,14 +25,14 @@ func main() {
 
 	methods, names := GatherExamples()
 
-	for i := 0; i <= len(names); i++ {
+	for i := 0; i < len(names); i++ {
 		runOne(names[i], methods[i])
 	}
 
 	fmt.Printf("Done running one, %d goroutines remaining\n", runtime.NumGoroutine())
 	// pprof.Lookup("goroutine").WriteTo(os.Stdout, 1)
-	time.Sleep(5 * time.Second)
-	fmt.Printf("Done sleeping, %d goroutines remaining\n", runtime.NumGoroutine())
+	// time.Sleep(5 * time.Second)
+	// fmt.Printf("Done sleeping, %d goroutines remaining\n", runtime.NumGoroutine())
 
 	// pprof.Lookup("goroutine").WriteTo(os.Stdout, 1)
 	// pprof.Lookup("threadcreate").WriteTo(os.Stdout, 1)
@@ -74,6 +75,7 @@ func runOne(name string, example reflect.Value) {
 	// TODO this appears to be the broken line, casuses vim-go to hang forever
 	fmt.Printf("Before running trace http process (%d)\n", runtime.NumGoroutine())
 	cmd := exec.CommandContext(ctx, "go", "tool", "trace", "-http=127.0.0.1:32000", tracePath)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Env = append(os.Environ(), "BROWSER=true")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -88,15 +90,17 @@ func runOne(name string, example reflect.Value) {
 
 	fmt.Println("Killing trace")
 
+	syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+
 	cmd.Process.Signal(os.Interrupt)
 	if err := cmd.Process.Kill(); err != nil {
 		log.Fatal("failed to kill process: ", err)
 	}
-	fmt.Printf("Waiting (%d)\n", runtime.NumGoroutine())
+	// fmt.Printf("Waiting (%d)\n", runtime.NumGoroutine())
 
-	if err := cmd.Wait(); err != nil {
-		log.Fatal("failed to kill process: ", err)
-	}
+	// if err := cmd.Wait(); err != nil {
+	//	log.Fatal("failed to wait on process: ", err)
+	// }
 	fmt.Printf("Done killing (%d)\n", runtime.NumGoroutine())
 }
 
